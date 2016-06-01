@@ -1,0 +1,105 @@
+---
+title: "Pima Indians Diabetes Database"
+output: github_document
+---
+
+
+##資料前處理
+此資料來源為Pima Indians Diabetes Database
+###資料介紹:糖尿病資料集
+escription: Predict the onset of diabetes in female Pima Indians from medical record data.
+Type: Binary Classification
+Dimensions: 768 instances, 9 attributes
+Inputs: Numeric
+Output: Categorical, 2 class labels
+###資料介紹:糖尿病資料集
+Number of times pregnant
+Plasma glucose concentration a 2 hours in an oral glucose tolerance test
+Diastolic blood pressure (mm Hg)
+Triceps skin fold thickness (mm)
+2-Hour serum insulin (mu U/ml)
+Body mass index (weight in kg/(height in m)^2)
+Diabetes pedigree function
+Age (years)
+Class variable (0 or 1)
+
+### 資料讀取
+```{r }
+install.packages("mlbench")
+library(mlbench)
+data(PimaIndiansDiabetes)
+str(PimaIndiansDiabetes) 
+head(PimaIndiansDiabetes)
+library(knitr)
+kable(head(PimaIndiansDiabetes),)
+```
+| pregnant| glucose| pressure| triceps| insulin| mass| pedigree| age|diabetes |
+|--------:|-------:|--------:|-------:|-------:|----:|--------:|---:|:--------|
+|        6|     148|       72|      35|       0| 33.6|    0.627|  50|pos      |
+|        1|      85|       66|      29|       0| 26.6|    0.351|  31|neg      |
+|        8|     183|       64|       0|       0| 23.3|    0.672|  32|pos      |
+|        1|      89|       66|      23|      94| 28.1|    0.167|  21|neg      |
+|        0|     137|       40|      35|     168| 43.1|    2.288|  33|pos      |
+|        5|     116|       74|       0|       0| 25.6|    0.201|  30|neg      |
+
+### 將資料隨機分為訓練組與測試組
+隨機將2/3的資料分到訓練組（Test==F），剩下1/3為測試組（Test==T
+```{r}
+PimaIndiansDiabetesC<-
+PimaIndiansDiabetes[complete.cases(PimaIndiansDiabetes),]
+c(nrow(PimaIndiansDiabetes),nrow(PimaIndiansDiabetesC))
+PimaIndiansDiabetesC$Test<-F
+PimaIndiansDiabetesC[
+sample(1:nrow(PimaIndiansDiabetesC),nrow(PimaIndiansDiabetesC)/3),
+]$Test<-T
+c(sum(PimaIndiansDiabetesC$Test==F),sum(PimaIndiansDiabetesC$Test==T))
+PimaIndiansDiabetesC$diabetes<-factor(PimaIndiansDiabetesC$diabetes,levels=c("pos","neg"))
+```
+可得訓練組案例數為512，測試組案例數為256
+
+
+
+##預測模型建立
+
+### 模型建立
+```{r }
+fit<-glm(diabetes~.,PimaIndiansDiabetesC[PimaIndiansDiabetesC$Test==F,],family="binomial")
+library(MASS)
+finalFit<-stepAIC(fit,direction = "both",trace = F)
+summary(finalFit)$coefficients
+library(knitr)
+kable(summary(finalFit)$coefficients,)
+```
+|            |   Estimate| Std. Error|   z value| Pr(>&#124;z&#124;)|
+|:-----------|----------:|----------:|---------:|------------------:|
+|(Intercept) |  8.1384259|  0.8347827|  9.749155|          0.0000000|
+|pregnant    | -0.1565576|  0.0350892| -4.461701|          0.0000081|
+|glucose     | -0.0364430|  0.0043164| -8.442897|          0.0000000|
+|pressure    |  0.0119172|  0.0060040|  1.984871|          0.0471589|
+|insulin     |  0.0018489|  0.0009697|  1.906679|          0.0565621|
+|mass        | -0.0915798|  0.0172509| -5.308714|          0.0000001|
+|pedigree    | -0.5609676|  0.3496302| -1.604460|          0.1086127|
+
+
+install.packages("caret")
+install.packages("lattice")
+install.packages("ggplot2")
+
+### 模型說明
+由上述參數可知，使用產出的資料以邏輯迴歸建立模型預測，經最佳化後，模型使用參數為pregnant、glucose、pressure、insulin、mass、pedigree  ，共6個參數，各參數代表從不同因素之下所得的資料結果
+
+##預測模型驗證
+
+```{r }
+pimPred<-predict(finalFit,newdata = PimaIndiansDiabetesC[PimaIndiansDiabetesC$Test==T,])
+pimAns<-ifelse(pimPred<0.5,"pos","neg") 
+pimAns<-factor(pimAns,levels = c("pos","neg"))
+#install.packages("caret")
+#install.packages("lattice")
+#install.packages("ggplot2")
+library(caret)
+sensitivity(pimAns,PimaIndiansDiabetesC[PimaIndiansDiabetesC$Test==T,]$diabetes)
+specificity(pimAns,PimaIndiansDiabetesC[PimaIndiansDiabetesC$Test==T,]$diabetes)
+posPredValue(pimAns,PimaIndiansDiabetesC[PimaIndiansDiabetesC$Test==T,]$diabetes)
+negPredValue(pimAns,PimaIndiansDiabetesC[PimaIndiansDiabetesC$Test==T,]$diabetes)
+```
